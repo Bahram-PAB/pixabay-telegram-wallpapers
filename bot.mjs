@@ -32,7 +32,7 @@ const search = async () => {
 const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 
 const GEMINI_KEY = process.env.GEMINI_KEY; // optional — falls back to Pixabay tags
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash-lite";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite"; // 2.5 retired for new keys (404)
 
 // چند نمونه برای اینکه لحن دست مدل عادی شود
 const EXAMPLES = `نمونه‌ها:
