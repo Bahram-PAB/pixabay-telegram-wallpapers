@@ -1,8 +1,16 @@
 name: wallpapers
 on:
   schedule:
-    - cron: "30 4,15 * * *" # 08:00 و 19:00 به وقت تهران
-  workflow_dispatch: {} # اجرای دستی برای تست
+    - cron: "0 5 * * *"   # 09:00 تهران — آلبوم عکس
+    - cron: "30 15 * * *" # 19:00 تهران — ویدئو
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "photos = آلبوم صبح / video = ویدئو عصر"
+        required: true
+        default: "photos"
+        type: choice
+        options: [photos, video]
 
 permissions:
   contents: write
@@ -15,15 +23,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: node bot.mjs
+      - run: node bot.mjs ${{ github.event.inputs.mode || 'photos' }}
         env:
           PIXABAY_KEY: ${{ secrets.PIXABAY_KEY }}
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
           TG_CHAT: ${{ secrets.TG_CHAT }}
-          GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
       - name: remember sent ids
         run: |
           git config user.name "bot"
           git config user.email "bot@users.noreply.github.com"
-          git add sent.json
+          git add sent.json sent-videos.json
           git diff --cached --quiet || { git commit -m "sent ids [skip ci]" && git push; }
