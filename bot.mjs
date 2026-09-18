@@ -1,6 +1,6 @@
 // Pixabay -> Telegram wallpaper bot (stdlib only, Node 18+)
 // ponytail: sent IDs live in sent.json committed to the repo; switch to a DB only if >10k images.
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, appendFileSync } from "node:fs";
 
 const QUERIES = ["mountain climbing", "rock climbing", "mountaineering", "mountain peak", "alpine climbing"];
 const MIN_HEIGHT = 1600; // px — full-image height, filters out tiny previews
@@ -76,9 +76,15 @@ ${EXAMPLES}
       ] }] },
     );
     const text = out.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+    if (!text) {
+      // پاسخ ۲۰۰ اما بدون متن — بلاک ایمنی؟ promptFeedback را لاگ کن
+      const fb = JSON.stringify(out.promptFeedback || out.candidates?.[0] || {}).slice(0, 300);
+      try { appendFileSync("gemini-debug.log", `${new Date().toISOString()} #${h.id} EMPTY-RESPONSE ${fb}\n`); } catch {}
+    }
     return text === "NO" ? "NO" : text || null;
   } catch (e) {
     console.log(`gemini skip #${h.id}: ${e.message}`);
+    try { appendFileSync("gemini-debug.log", `${new Date().toISOString()} #${h.id} ${GEMINI_KEY ? "key=present" : "key=MISSING"} ${GEMINI_MODEL}: ${e.message}\n`); } catch {}
     return null;
   }
 };
@@ -120,4 +126,13 @@ for (const h of fresh) {
 }
 
 if (n) writeFileSync(SENT_FILE, JSON.stringify(sent.slice(-MAX_SENT)));
+if (existsSync("gemini-debug.log")) {
+  // لاگ دیباگ را در ریپو commit کن تا از UI گیت‌هاب قابل خواندن باشد
+  const { execFileSync } = await import("node:child_process");
+  try {
+    execFileSync("git", ["add", "gemini-debug.log"]);
+    execFileSync("git", ["-c", "user.name=bot", "-c", "user.email=bot@users.noreply.github.com", "commit", "-m", "gemini debug [skip ci]"]);
+    execFileSync("git", ["push"]);
+  } catch {}
+}
 console.log(n ? `done: ${n} photo(s)` : "nothing new, retry next run");
