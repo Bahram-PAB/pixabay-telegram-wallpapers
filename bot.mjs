@@ -57,7 +57,8 @@ const post = async (url, body) => {
   return res.json();
 };
 
-// مدل بینایی عکس را می‌بیند و یک جمله فارسی برمی‌گرداند؛ خطا -> null (کپشن از tags)
+// مدل بینایی: هم دروازهٔ موضوع است هم کپشن‌ساز — یک صدا زدن برای هر دو
+// خروجی: «NO» = غیرمرتبط (ارسال نشود)، otherwise = هایکوی فارسی
 const describe = async h => {
   if (!GEMINI_KEY) return null;
   try {
@@ -68,12 +69,14 @@ const describe = async h => {
       `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_KEY}`,
       { contents: [{ parts: [
         { inline_data: { mime_type: img.headers.get("content-type")?.split(";")[0] || "image/jpeg", data: b64 } },
-        { text: `برای این عکس یک کپشن شاعرانهٔ کوتاه فارسی بنویس — حالت هایکو: سه خط کوتاه (۱ تا ۳ کلمه در هر خط)، خطوط با خطِ جدید جدا شوند، تصویرِ صحنه را در ذهن می‌آورد نه توصیف خشک آن، لحنی آرام و تأمل‌برانگیز.
+        { text: `این تصویر را ببین. اگر موضوع اصلی آن کوه، سنگنوردی، کوه‌نوردی یا مناظر کوهستانی نیست، فقط بنویس: NO
+اگر هست، برایش یک کپشن شاعرانهٔ کوتاه فارسی بنویس — حالت هایکو: سه خط کوتاه (۱ تا ۳ کلمه در هر خط)، خطوط با خطِ جدید جدا شوند، تصویرِ صحنه را در ذهن می‌آورد نه توصیف خشک آن، لحنی آرام و تأمل‌برانگیز.
 ${EXAMPLES}
 فقط خود کپشن را بنویس — بدون ایموجی، بدون نقل‌قول، بدون توضیح اضافه.` },
       ] }] },
     );
-    return out.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || null;
+    const text = out.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+    return text === "NO" ? "NO" : text || null;
   } catch (e) {
     console.log(`gemini skip #${h.id}: ${e.message}`);
     return null;
@@ -82,6 +85,7 @@ ${EXAMPLES}
 
 const send = async h => {
   const desc = await describe(h);
+  if (desc === "NO") return "off-topic"; // Gemini گفت این عکس کوه نیست — نفرست
   const caption = `⛰️ ${desc || h.tags}\n📷 ${h.user} — تمام‌صفحه: ${h.pageURL}`.slice(0, 1024);
   return get(`https://api.telegram.org/bot${process.env.TG_TOKEN}/sendPhoto`, {
     chat_id: process.env.TG_CHAT,
@@ -102,9 +106,13 @@ let n = 0;
 for (const h of fresh) {
   if (n >= PER_RUN) break;
   try {
-    await send(h);
-    n++;
-    console.log(`sent #${h.id}`);
+    const r = await send(h);
+    if (r === "off-topic") {
+      console.log(`off-topic #${h.id}, skipped`); // Gemini veto — still recorded so it never returns
+    } else {
+      n++;
+      console.log(`sent #${h.id}`);
+    }
   } catch (e) {
     console.log(`skip #${h.id}: ${e.message}`); // Telegram couldn't fetch it; don't retry forever
   }

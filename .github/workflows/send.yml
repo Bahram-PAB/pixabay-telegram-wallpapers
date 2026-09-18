@@ -20,6 +20,7 @@ jobs:
           PIXABAY_KEY: ${{ secrets.PIXABAY_KEY }}
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
           TG_CHAT: ${{ secrets.TG_CHAT }}
+          GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
       - name: remember sent ids
         run: |
           git config user.name "bot"
