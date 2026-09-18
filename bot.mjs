@@ -56,7 +56,7 @@ try {
   if (MODE === "video") {
     const v = fresh[0];
     if (!v) throw new Error("no fresh video");
-    const size = v.videos?.hd || v.videos?.sd || v.videos?.["4k"]; // کلیدهای واقعی API ویدئو: sd/hd/4k
+    const size = v.videos?.medium || v.videos?.small || v.videos?.large; // medium همیشه موجود است (مستندات)
     if (!size?.url) throw new Error(`no playable size: ${Object.keys(v.videos || {}).join(",")}`);
     await get(`https://api.telegram.org/bot${process.env.TG_TOKEN}/sendVideo`, {
       chat_id: process.env.TG_CHAT, video: size.url, caption: CAPTION,
