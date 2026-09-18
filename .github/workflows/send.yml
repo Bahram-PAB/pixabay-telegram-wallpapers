@@ -1,0 +1,28 @@
+name: wallpapers
+on:
+  schedule:
+    - cron: "30 4,15 * * *" # 08:00 و 18:30 به وقت تهران
+  workflow_dispatch: {} # اجرای دستی برای تست
+
+permissions:
+  contents: write
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node bot.mjs
+        env:
+          PIXABAY_KEY: ${{ secrets.PIXABAY_KEY }}
+          TG_TOKEN: ${{ secrets.TG_TOKEN }}
+          TG_CHAT: ${{ secrets.TG_CHAT }}
+      - name: remember sent ids
+        run: |
+          git config user.name "bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add sent.json
+          git diff --cached --quiet || { git commit -m "sent ids [skip ci]" && git push; }
