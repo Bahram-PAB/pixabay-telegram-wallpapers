@@ -59,15 +59,25 @@ try {
     const size = v.videos?.large?.url && v.videos.large.size < 45e6 && v.videos.large
       || v.videos?.medium || v.videos?.small; // large اگر زیر سقف 50MB تلگرام بود، وگرنه medium (همیشه موجود)
     if (!size?.url) throw new Error(`no playable size: ${Object.keys(v.videos || {}).join(",")}`);
-    // ثابت‌شدن حافظهٔ «ویدئوی دوبل»: آپلود ویدئو ممکن است از تایم‌اوت کندتر باشد ولی واقعاً ارسال شده باشد؛
-    // پس بعد از یک sendVideo موفقِ مشکوک، قبل از تلاش دوباره state را بررسی کن.
-    const params = {
-      chat_id: process.env.TG_CHAT, video: size.url, caption: CAPTION,
-      supports_streaming: "true", width: size.width || 0, height: size.height || 0, duration: v.duration || 0,
-    };
+    // تلگرام گاهی URL های ویدئوی Pixabay را نمی‌تواند بکشد («failed to get HTTP URL content»)
+    // پس خودمان دانلود و به‌صورت فایل آپلود می‌کنیم — آپلود = نمایش درست ویدئو، بدون اتکا به فچر تلگرام
+    const dl = await fetch(size.url, { signal: AbortSignal.timeout(180000) });
+    if (!dl.ok) throw new Error(`pixabay cdn: ${dl.status}`);
+    const buf = await dl.arrayBuffer();
+    const fd = new FormData();
+    fd.append("chat_id", process.env.TG_CHAT);
+    fd.append("caption", CAPTION);
+    fd.append("supports_streaming", "true");
+    fd.append("width", String(size.width || 0));
+    fd.append("height", String(size.height || 0));
+    fd.append("duration", String(v.duration || 0));
+    fd.append("video", new Blob([buf], { type: "video/mp4" }), `${v.id}.mp4`);
     let ok = false;
     try {
-      await get(`https://api.telegram.org/bot${process.env.TG_TOKEN}/sendVideo`, params, 300000);
+      const res = await fetch(`https://api.telegram.org/bot${process.env.TG_TOKEN}/sendVideo`, {
+        method: "POST", body: fd, signal: AbortSignal.timeout(300000),
+      });
+      if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
       ok = true;
     } catch (e) {
       // تایم‌اوت؟ شاید ویدئو رسیده باشد — به تلگرام نگاه کن، اگر بود دوباره نفرست
