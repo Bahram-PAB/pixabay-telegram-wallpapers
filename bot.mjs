@@ -31,11 +31,48 @@ const search = async () => {
 
 const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 
-const send = h => get(`https://api.telegram.org/bot${process.env.TG_TOKEN}/sendPhoto`, {
-  chat_id: process.env.TG_CHAT,
-  photo: h.largeImageURL, // Telegram fetches the image itself — no download needed
-  caption: `⛰️ ${h.tags}\n📷 ${h.user} — تمام‌صفحه: ${h.pageURL}`.slice(0, 1024),
-});
+const GEMINI_KEY = process.env.GEMINI_KEY; // optional — falls back to Pixabay tags
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash-lite";
+
+const post = async (url, body) => {
+  const res = await fetch(url, {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify(body), signal: AbortSignal.timeout(60000),
+  });
+  if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+  return res.json();
+};
+
+// مدل بینایی عکس را می‌بیند و یک جمله فارسی برمی‌گرداند؛ خطا -> null (کپشن از tags)
+const describe = async h => {
+  if (!GEMINI_KEY) return null;
+  try {
+    const img = await fetch(h.largeImageURL, { signal: AbortSignal.timeout(30000) });
+    if (!img.ok) return null;
+    const b64 = Buffer.from(await img.arrayBuffer()).toString("base64");
+    const out = await post(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_KEY}`,
+      { contents: [{ parts: [
+        { inline_data: { mime_type: img.headers.get("content-type")?.split(";")[0] || "image/jpeg", data: b64 } },
+        { text: "این عکس را در یک جملهٔ کوتاه و زیبای فارسی (حداکثر ۱۲ کلمه) توصیف کن. فقط همان جمله را بنویس، بدون ایموجی و بدون نقل‌قول." },
+      ] }] },
+    );
+    return out.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || null;
+  } catch (e) {
+    console.log(`gemini skip #${h.id}: ${e.message}`);
+    return null;
+  }
+};
+
+const send = async h => {
+  const desc = await describe(h);
+  const caption = `⛰️ ${desc || h.tags}\n📷 ${h.user} — تمام‌صفحه: ${h.pageURL}`.slice(0, 1024);
+  return get(`https://api.telegram.org/bot${process.env.TG_TOKEN}/sendPhoto`, {
+    chat_id: process.env.TG_CHAT,
+    photo: h.largeImageURL, // Telegram fetches the image itself — no download needed
+    caption,
+  });
+};
 
 let fresh = [];
 try {
