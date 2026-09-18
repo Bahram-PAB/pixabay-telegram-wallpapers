@@ -56,11 +56,11 @@ try {
   if (MODE === "video") {
     const v = fresh[0];
     if (!v) throw new Error("no fresh video");
-    const url = v.videos?.large?.url || v.videos?.medium?.url; // large از HD پیشی می‌گیرد، کافی است
-    if (!url) throw new Error("no playable size");
+    const size = v.videos?.hd || v.videos?.sd || v.videos?.["4k"]; // کلیدهای واقعی API ویدئو: sd/hd/4k
+    if (!size?.url) throw new Error(`no playable size: ${Object.keys(v.videos || {}).join(",")}`);
     await get(`https://api.telegram.org/bot${process.env.TG_TOKEN}/sendVideo`, {
-      chat_id: process.env.TG_CHAT, video: url, caption: CAPTION,
-      supports_streaming: "true", width: v.videos?.large?.width || 0, height: v.videos?.large?.height || 0, duration: v.duration || 0,
+      chat_id: process.env.TG_CHAT, video: size.url, caption: CAPTION,
+      supports_streaming: "true", width: size.width || 0, height: size.height || 0, duration: v.duration || 0,
     });
     sent.push(v.id);
     writeFileSync(SENT_FILE, JSON.stringify(sent.slice(-MAX_SENT)));
