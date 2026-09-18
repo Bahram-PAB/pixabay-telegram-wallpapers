@@ -14,8 +14,8 @@ for (const name of ["PIXABAY_KEY", "TG_TOKEN", "TG_CHAT"]) {
   if (!process.env[name]) { console.error(`missing env: ${name}`); process.exit(1); }
 }
 
-const get = async (url, params) => {
-  const res = await fetch(`${url}?${new URLSearchParams(params)}`, { signal: AbortSignal.timeout(30000) });
+const get = async (url, params, ms = 30000) => {
+  const res = await fetch(`${url}?${new URLSearchParams(params)}`, { signal: AbortSignal.timeout(ms) });
   if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
   return res.json();
 };
@@ -56,21 +56,42 @@ try {
   if (MODE === "video") {
     const v = fresh[0];
     if (!v) throw new Error("no fresh video");
-    const size = v.videos?.medium || v.videos?.small || v.videos?.large; // medium همیشه موجود است (مستندات)
+    const size = v.videos?.large?.url && v.videos.large.size < 45e6 && v.videos.large
+      || v.videos?.medium || v.videos?.small; // large اگر زیر سقف 50MB تلگرام بود، وگرنه medium (همیشه موجود)
     if (!size?.url) throw new Error(`no playable size: ${Object.keys(v.videos || {}).join(",")}`);
-    await get(`https://api.telegram.org/bot${process.env.TG_TOKEN}/sendVideo`, {
+    // ثابت‌شدن حافظهٔ «ویدئوی دوبل»: آپلود ویدئو ممکن است از تایم‌اوت کندتر باشد ولی واقعاً ارسال شده باشد؛
+    // پس بعد از یک sendVideo موفقِ مشکوک، قبل از تلاش دوباره state را بررسی کن.
+    const params = {
       chat_id: process.env.TG_CHAT, video: size.url, caption: CAPTION,
       supports_streaming: "true", width: size.width || 0, height: size.height || 0, duration: v.duration || 0,
-    });
-    sent.push(v.id);
-    writeFileSync(SENT_FILE, JSON.stringify(sent.slice(-MAX_SENT)));
-    console.log(`done: video #${v.id}`);
+    };
+    let ok = false;
+    try {
+      await get(`https://api.telegram.org/bot${process.env.TG_TOKEN}/sendVideo`, params, 300000);
+      ok = true;
+    } catch (e) {
+      // تایم‌اوت؟ شاید ویدئو رسیده باشد — به تلگرام نگاه کن، اگر بود دوباره نفرست
+      const hist = await get(`https://api.telegram.org/bot${process.env.TG_TOKEN}/getUpdates`, { limit: 1, allowed_updates: '["channel_post"]' }, 15000);
+      const last = hist.result?.[0]?.channel_post;
+      const alreadySent = last?.video && Math.abs((last.video.duration || 0) - (v.duration || 0)) <= 1;
+      if (alreadySent) {
+        console.log(`timeout but video #${v.id} already in channel`);
+      } else {
+        throw e;
+      }
+    }
+    if (ok || alreadySent) {
+      sent.push(v.id);
+      writeFileSync(SENT_FILE, JSON.stringify(sent.slice(-MAX_SENT)));
+      console.log(`done: video #${v.id}`);
+    }
   } else {
     const picks = fresh.slice(0, ALBUM_SIZE);
     if (picks.length) {
+      // کپشن باید روی اولین آیتم media باشد، نه پارامتر جداگانه
       await get(`https://api.telegram.org/bot${process.env.TG_TOKEN}/sendMediaGroup`, {
-        chat_id: process.env.TG_CHAT, caption: CAPTION,
-        media: JSON.stringify(picks.map(h => ({ type: "photo", media: h.largeImageURL }))),
+        chat_id: process.env.TG_CHAT,
+        media: JSON.stringify(picks.map((h, i) => ({ type: "photo", media: h.largeImageURL, ...(i === 0 && { caption: CAPTION }) }))),
       });
       sent.push(...picks.map(h => h.id));
       writeFileSync(SENT_FILE, JSON.stringify(sent.slice(-MAX_SENT)));
