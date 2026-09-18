@@ -22,8 +22,8 @@ const get = async (url, params, ms = 30000) => {
 
 const sent = existsSync(SENT_FILE) ? JSON.parse(readFileSync(SENT_FILE, "utf8")) : [];
 
-// Gemini حذف شد — فیلتر فقط با کوئری‌های Pixabay. تگ حشره/حیوان هم رد می‌شود.
-const ANIMAL_TAGS = /\b(animal|insect|bug|beetle|butterfly|bird|cat|dog|horse|sheep|goat|wildlife|mammal|reptile|frog|bee|spider)\b/i;
+// Gemini حذف شد — فیلتر فقط با کوئری‌های Pixabay. تگ حیوان/حشره و انیمیشن/کارتون رد می‌شود.
+const BAD_TAGS = /\b(animal|insect|bug|beetle|butterfly|bird|cat|dog|horse|sheep|goat|wildlife|mammal|reptile|frog|bee|spider|animation|animated|cartoon|cgi|3d render|illustration|painting|drawing|loop)\b/i;
 
 const search = async () => {
   const q = QUERIES[Math.floor(Math.random() * QUERIES.length)];
@@ -33,10 +33,12 @@ const search = async () => {
   };
   const path = MODE === "video" ? "https://pixabay.com/api/videos/" : "https://pixabay.com/api/";
   if (MODE !== "video") base.image_type = "photo", base.orientation = "vertical";
+  else base.video_type = "film"; // فقط ویدئوی واقعی — انیمیشن/کارتون از API حذف می‌شود
   const { hits } = await get(path, base);
   return hits.filter(h => !sent.includes(h.id)
     && (MODE === "video" || h.imageHeight >= MIN_HEIGHT)
-    && !ANIMAL_TAGS.test(h.tags || ""));
+    && (MODE !== "video" || h.type === "film") // دوبار اطمینان: فقط فوتیج واقعی
+    && !BAD_TAGS.test(h.tags || ""));
 };
 
 const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
@@ -56,8 +58,7 @@ try {
   if (MODE === "video") {
     const v = fresh[0];
     if (!v) throw new Error("no fresh video");
-    const size = v.videos?.large?.url && v.videos.large.size < 45e6 && v.videos.large
-      || v.videos?.medium || v.videos?.small; // large اگر زیر سقف 50MB تلگرام بود، وگرنه medium (همیشه موجود)
+    const size = v.videos?.medium || v.videos?.small; // medium (1920x1080) — 4K/large نمی‌خواهیم
     if (!size?.url) throw new Error(`no playable size: ${Object.keys(v.videos || {}).join(",")}`);
     // تلگرام گاهی URL های ویدئوی Pixabay را نمی‌تواند بکشد («failed to get HTTP URL content»)
     // پس خودمان دانلود و به‌صورت فایل آپلود می‌کنیم — آپلود = نمایش درست ویدئو، بدون اتکا به فچر تلگرام
