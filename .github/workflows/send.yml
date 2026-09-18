@@ -1,7 +1,7 @@
 name: wallpapers
 on:
   schedule:
-    - cron: "30 4,15 * * *" # 08:00 و 18:30 به وقت تهران
+    - cron: "30 4,15 * * *" # 08:00 و 19:00 به وقت تهران
   workflow_dispatch: {} # اجرای دستی برای تست
 
 permissions:
