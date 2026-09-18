@@ -34,6 +34,20 @@ const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.f
 const GEMINI_KEY = process.env.GEMINI_KEY; // optional — falls back to Pixabay tags
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash-lite";
 
+// چند نمونه برای اینکه لحن دست مدل عادی شود
+const EXAMPLES = `نمونه‌ها:
+برف می‌بارد —
+پای کوه تنها
+سنگ تمام می‌خوابد
+
+سنگِ بلند
+سایه‌اش در رود
+خم می‌شود و می‌ایستد
+
+باد از قله
+کوله‌ای سبک می‌کند
+راه هنوز جاست`;
+
 const post = async (url, body) => {
   const res = await fetch(url, {
     method: "POST", headers: { "content-type": "application/json" },
@@ -54,7 +68,9 @@ const describe = async h => {
       `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_KEY}`,
       { contents: [{ parts: [
         { inline_data: { mime_type: img.headers.get("content-type")?.split(";")[0] || "image/jpeg", data: b64 } },
-        { text: "این عکس را در یک جملهٔ کوتاه و زیبای فارسی (حداکثر ۱۲ کلمه) توصیف کن. فقط همان جمله را بنویس، بدون ایموجی و بدون نقل‌قول." },
+        { text: `برای این عکس یک کپشن شاعرانهٔ کوتاه فارسی بنویس — حالت هایکو: سه خط کوتاه (۱ تا ۳ کلمه در هر خط)، خطوط با خطِ جدید جدا شوند، تصویرِ صحنه را در ذهن می‌آورد نه توصیف خشک آن، لحنی آرام و تأمل‌برانگیز.
+${EXAMPLES}
+فقط خود کپشن را بنویس — بدون ایموجی، بدون نقل‌قول، بدون توضیح اضافه.` },
       ] }] },
     );
     return out.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || null;
