@@ -1,12 +1,11 @@
 name: wallpapers
 on:
   schedule:
-    - cron: "0 5 * * *"   # 09:00 تهران — آلبوم عکس
-    - cron: "30 15 * * *" # 19:00 تهران — ویدئو
+    - cron: "0 5 * * *"   # 09:00 تهران — آلبوم عکس (ویدئو فعلاً غیرفعال)
   workflow_dispatch:
     inputs:
       mode:
-        description: "photos = آلبوم صبح / video = ویدئو عصر"
+        description: "photos = آلبوم / video = ویدئو (فعلاً غیرفعال)"
         required: true
         default: "photos"
         type: choice
