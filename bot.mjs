@@ -28,8 +28,8 @@ const BAD_TAGS = /\b(animal|insect|bug|beetle|butterfly|bird|cat|dog|horse|sheep
 const search = async () => {
   const q = QUERIES[Math.floor(Math.random() * QUERIES.length)];
   const base = {
-    key: process.env.PIXABAY_KEY, q, per_page: 50,
-    safesearch: "true", order: "latest",
+    key: process.env.PIXABAY_KEY, q, per_page: 100,
+    safesearch: "true", order: "popular",
   };
   const path = MODE === "video" ? "https://pixabay.com/api/videos/" : "https://pixabay.com/api/";
   if (MODE !== "video") base.image_type = "photo", base.orientation = "vertical";
